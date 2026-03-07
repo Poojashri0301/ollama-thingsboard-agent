@@ -1,0 +1,17 @@
+# Sensitive config
+config.py
+create_github_repo.py
+list_all_mcp_tools.py
+test_*.py
+debug_*.py
+*.pyc
+__pycache__/
+venv/
+.gemini/
+.agents/
+.agent/
+_agents/
+_agent/
+brain/
+tmp/
+*.log
