@@ -1,5 +1,6 @@
 # tb_asset.py
 from mcp_client import MCPClient
+import json
 
 mcp = None
 
@@ -8,24 +9,41 @@ def set_mcp_client(client: MCPClient):
     mcp = client
 
 def _extract(result):
+    if "error" in result:
+        print(f"[MCP Error] {result['error'].get('message')}")
+        return "{}"
     try:
         return result["result"]["content"][0]["text"]
-    except:
-        return str(result)
+    except Exception as e:
+        print(f"[Extract Error] {e}")
+        return "{}"
 
 # Get all assets from ThingsBoard tenant
-def getTenantAssets(pageSize: str = "20", page: str = "0") -> str:
+def getTenantAssets(pageSize: int = 100, max_pages: int = 10) -> str:
     """
-    Get all assets in the tenant.
+    Get a summary list of all assets in the tenant.
+    Returns: Name, ID, Type, Label.
     Use when user asks to list all assets OR asks how many assets there are.
-    The response includes 'totalElements' which gives the exact total count.
-    Examples:
-    - 'list all assets'
-    - 'how many assets are there' -> read totalElements from response
-    - 'total number of assets' -> read totalElements from response
     """
-    result = mcp.call_tool("getTenantAssets", {"pageSize": pageSize, "page": page})
-    return _extract(result)
+    all_data = []
+    page = 0
+    while page < max_pages:
+        raw = _extract(mcp.call_tool("getTenantAssets", {"pageSize": int(pageSize), "page": int(page)}))
+        data = json.loads(raw)
+        
+        # Summarize
+        for a in data.get("data", []):
+            all_data.append({
+                "name": a.get("name"),
+                "id": a.get("id", {}).get("id"),
+                "type": a.get("type"),
+                "label": a.get("label")
+            })
+
+        if not data.get("hasNext", False):
+            break
+        page += 1
+    return json.dumps({"assets": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2)
 
 # Get a specific asset by its ID.
 def getAssetById(assetId: str) -> str:
@@ -42,69 +60,80 @@ def getTenantAsset(assetName: str) -> str:
     return _extract(result)
 
 # Get all assets assigned to a specific customer.
-def getCustomerAssets(customerId: str, pageSize: str = "20", page: str = "0", type: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
+def getCustomerAssets(customerId: str, pageSize: str = "100", type: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "", max_pages: int = 10) -> str:
     """Get assets belonging to a customer. Use when user asks for assets of a specific customer."""
-    args = {"customerId": customerId, "pageSize": pageSize, "page": page}
-    if type:
-        args["type"] = type
-    if textSearch:
-        args["textSearch"] = textSearch
-    if sortProperty:
-        args["sortProperty"] = sortProperty
-    if sortOrder:
-        args["sortOrder"] = sortOrder
-    result = mcp.call_tool("getCustomerAssets", args)
-    return _extract(result)
+    all_data = []
+    page = 0
+    while page < max_pages:
+        args = {"customerId": customerId, "pageSize": int(pageSize), "page": page}
+        if type: args["type"] = type
+        if textSearch: args["textSearch"] = textSearch
+        if sortProperty: args["sortProperty"] = sortProperty
+        if sortOrder: args["sortOrder"] = sortOrder
+        data = json.loads(_extract(mcp.call_tool("getCustomerAssets", args)))
+        all_data.extend(data.get("data", []))
+        if not data.get("hasNext", False):
+            break
+        page += 1
+    return json.dumps({"data": all_data, "truncated": page == max_pages}, indent=2)
 
 # Get all assets assigned to a specific user.
-def getUserAssets(userId: str, pageSize: str = "20", page: str = "0", type: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
+def getUserAssets(userId: str, pageSize: str = "100", type: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
     """Get assets belonging to a user. Use when user asks for assets of a specific user."""
-    args = {"userId": userId, "pageSize": pageSize, "page": page}
-    if type:
-        args["type"] = type
-    if textSearch:
-        args["textSearch"] = textSearch
-    if sortProperty:
-        args["sortProperty"] = sortProperty
-    if sortOrder:
-        args["sortOrder"] = sortOrder
-    result = mcp.call_tool("getUserAssets", args)
-    return _extract(result)
+    all_data = []
+    page = 0
+    max_pages = 10
+    while page < max_pages:
+        args = {"userId": userId, "pageSize": int(pageSize), "page": page}
+        if type: args["type"] = type
+        if textSearch: args["textSearch"] = textSearch
+        if sortProperty: args["sortProperty"] = sortProperty
+        if sortOrder: args["sortOrder"] = sortOrder
+        data = json.loads(_extract(mcp.call_tool("getUserAssets", args)))
+        all_data.extend(data.get("data", []))
+        if not data.get("hasNext", False):
+            break
+        page += 1
+    return json.dumps({"data": all_data}, indent=2)
 
 
 # Get detailed info of all assets assigned to a specific customer.
-def getCustomerAssetInfos(customerId: str, pageSize: str = "20", page: str = "0", type: str = "", assetProfileId: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
-    
-    args = {"customerId": customerId, "pageSize": pageSize, "page": page}
-    if type:
-        args["type"] = type
-    if assetProfileId:
-        args["assetProfileId"] = assetProfileId
-    if textSearch:
-        args["textSearch"] = textSearch
-    if sortProperty:
-        args["sortProperty"] = sortProperty
-    if sortOrder:
-        args["sortOrder"] = sortOrder
-    result = mcp.call_tool("getCustomerAssetInfos", args)
-    return _extract(result)
+def getCustomerAssetInfos(customerId: str, pageSize: str = "100", type: str = "", assetProfileId: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
+    all_data = []
+    page = 0
+    max_pages = 10
+    while page < max_pages:
+        args = {"customerId": customerId, "pageSize": int(pageSize), "page": page}
+        if type: args["type"] = type
+        if assetProfileId: args["assetProfileId"] = assetProfileId
+        if textSearch: args["textSearch"] = textSearch
+        if sortProperty: args["sortProperty"] = sortProperty
+        if sortOrder: args["sortOrder"] = sortOrder
+        data = json.loads(_extract(mcp.call_tool("getCustomerAssetInfos", args)))
+        all_data.extend(data.get("data", []))
+        if not data.get("hasNext", False):
+            break
+        page += 1
+    return json.dumps({"data": all_data}, indent=2)
 
 #  Get all assets with extra details like customer name and asset profile.
-def getTenantAssetInfos(pageSize: str = "20", page: str = "0", type: str = "", assetProfileId: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
-    
-    args = {"pageSize": pageSize, "page": page}
-    if type:
-        args["type"] = type
-    if assetProfileId:
-        args["assetProfileId"] = assetProfileId
-    if textSearch:
-        args["textSearch"] = textSearch
-    if sortProperty:
-        args["sortProperty"] = sortProperty
-    if sortOrder:
-        args["sortOrder"] = sortOrder
-    result = mcp.call_tool("getTenantAssetInfos", args)
-    return _extract(result)
+def getTenantAssetInfos(pageSize: str = "100", type: str = "", assetProfileId: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
+    all_data = []
+    page = 0
+    max_pages = 10
+    while page < max_pages:
+        args = {"pageSize": int(pageSize), "page": page}
+        if type: args["type"] = type
+        if assetProfileId: args["assetProfileId"] = assetProfileId
+        if textSearch: args["textSearch"] = textSearch
+        if sortProperty: args["sortProperty"] = sortProperty
+        if sortOrder: args["sortOrder"] = sortOrder
+        data = json.loads(_extract(mcp.call_tool("getTenantAssetInfos", args)))
+        all_data.extend(data.get("data", []))
+        if not data.get("hasNext", False):
+            break
+        page += 1
+    return json.dumps({"data": all_data}, indent=2)
 
 # Get multiple assets at once using comma separated IDs.
 def getAssetsByIds(assetIds: str) -> str:
@@ -113,12 +142,17 @@ def getAssetsByIds(assetIds: str) -> str:
     return _extract(result)
 
 # Get all assets that belong to a specific entity group.
-def getAssetsByEntityGroupId(entityGroupId: str, pageSize: str = "20", page: str = "0", sortProperty: str = "", sortOrder: str = "") -> str:
-   
-    args = {"entityGroupId": entityGroupId, "pageSize": pageSize, "page": page}
-    if sortProperty:
-        args["sortProperty"] = sortProperty
-    if sortOrder:
-        args["sortOrder"] = sortOrder
-    result = mcp.call_tool("getAssetsByEntityGroupId", args)
-    return _extract(result)
+def getAssetsByEntityGroupId(entityGroupId: str, pageSize: str = "100", sortProperty: str = "", sortOrder: str = "") -> str:
+    all_data = []
+    page = 0
+    max_pages = 10
+    while page < max_pages:
+        args = {"entityGroupId": entityGroupId, "pageSize": int(pageSize), "page": page}
+        if sortProperty: args["sortProperty"] = sortProperty
+        if sortOrder: args["sortOrder"] = sortOrder
+        data = json.loads(_extract(mcp.call_tool("getAssetsByEntityGroupId", args)))
+        all_data.extend(data.get("data", []))
+        if not data.get("hasNext", False):
+            break
+        page += 1
+    return json.dumps({"data": all_data}, indent=2)

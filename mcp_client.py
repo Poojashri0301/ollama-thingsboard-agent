@@ -10,7 +10,7 @@ from config import MCP_SERVER_URL
 class MCPClient:
     def __init__(self):
         self.session_id = None
-        self.messages = []
+        self.responses = {} # Map ID -> response
         self._connected = False
         self._connect()
 
@@ -42,7 +42,9 @@ class MCPClient:
                     threading.Thread(target=self._initialize, daemon=True).start()
                 elif event.data:
                     try:
-                        self.messages.append(json.loads(event.data))
+                        msg = json.loads(event.data)
+                        if "id" in msg:
+                            self.responses[msg["id"]] = msg
                     except:
                         pass
         except Exception as e:
@@ -76,7 +78,7 @@ class MCPClient:
                 url,
                 headers={"Content-Type": "application/json"},
                 data=json.dumps(payload),
-                timeout=15
+                timeout=45
             )
         except Exception as e:
             print(f"[MCP] POST error: {e}")
@@ -90,32 +92,32 @@ class MCPClient:
 
     def call_tool(self, tool_name: str, arguments: dict):
         self._wait_session()
-        before = len(self.messages)
+        msg_id = int(time.time() * 1000)
         self._post({
             "jsonrpc": "2.0",
-            "id": int(time.time()),
+            "id": msg_id,
             "method": "tools/call",
             "params": {"name": tool_name, "arguments": arguments}
         })
         start = time.time()
-        while len(self.messages) == before:
-            if time.time() - start > 15:
+        while msg_id not in self.responses:
+            if time.time() - start > 60: # Longer timeout for tool calls
                 raise TimeoutError(f"No response for tool: {tool_name}")
             time.sleep(0.1)
-        return self.messages[-1]
+        return self.responses.pop(msg_id)
 
     def list_tools(self):
         self._wait_session()
-        before = len(self.messages)
+        msg_id = int(time.time() * 1000)
         self._post({
             "jsonrpc": "2.0",
-            "id": int(time.time()),
+            "id": msg_id,
             "method": "tools/list",
             "params": {}
         })
         start = time.time()
-        while len(self.messages) == before:
-            if time.time() - start > 10:
+        while msg_id not in self.responses:
+            if time.time() - start > 15:
                 raise TimeoutError("No response for tools/list")
             time.sleep(0.1)
-        return self.messages[-1]
+        return self.responses.pop(msg_id)
