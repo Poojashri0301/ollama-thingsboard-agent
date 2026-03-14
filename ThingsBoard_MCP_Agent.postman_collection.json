@@ -1,0 +1,110 @@
+{
+	"info": {
+		"_postman_id": "8d39f67a-12e4-47b2-a4e9-6f1766a2cb1f",
+		"name": "ThingsBoard MCP Agent",
+		"description": "Collection to test the ThingsBoard MCP Agent Streaming API.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://192.168.1.43:8000/api/health",
+					"protocol": "http",
+					"host": [
+						"192.168.1.43"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Chat Stream",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{TB_JWT_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"question\": \"What is the current temperature of the Thermostat?\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.1.43:8000/api/chat",
+					"protocol": "http",
+					"host": [
+						"192.168.1.43"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"chat"
+					]
+				},
+				"description": "Streaming endpoint for agent communication. Returns SSE."
+			},
+			"response": []
+		},
+		{
+			"name": "Chat Sync",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{TB_JWT_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"question\": \"What is the current temperature of the Thermostat?\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.1.43:8000/api/chat/sync",
+					"protocol": "http",
+					"host": [
+						"192.168.1.43"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"chat",
+						"sync"
+					]
+				},
+				"description": "Standard synchronous endpoint for agent communication. Returns full JSON."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "TB_JWT_TOKEN",
+			"value": "YOUR_TOKEN_HERE",
+			"type": "string"
+		}
+	]
+}

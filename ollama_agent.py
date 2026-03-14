@@ -157,7 +157,17 @@ class OllamaTBAgent:
         }
 
     def ask(self, question: str):
-        print(f"\n[You] {question}")
+        """Sync wrapper for legacy/CLI usage."""
+        full_content = ""
+        for chunk in self.ask_stream(question):
+            full_content += chunk
+        print() # New line after response
+        return full_content
+
+    def ask_stream(self, question: str):
+        """Streaming version of ask. Yields chunks of text for API/UI usage."""
+        # Note: We don't print here to avoid cluttering API usage,
+        # but let the caller handle printing if needed.
         self.history.append({"role": "user", "content": question})
 
         max_iterations = 5
@@ -170,8 +180,6 @@ class OllamaTBAgent:
             }
 
             try:
-                # Use longer timeout (600s) and streaming for better UX
-                print("[Ollama] Thinking...", end="", flush=True)
                 response = requests.post(
                     f"{OLLAMA_BASE_URL}/api/chat", 
                     json=payload, 
@@ -191,25 +199,26 @@ class OllamaTBAgent:
                             if 'content' in msg_chunk:
                                 content = msg_chunk['content']
                                 full_content += content
-                                print(content, end="", flush=True)
+                                # Also support CLI printing for now if desired, but yielding is key
+                                # print(content, end="", flush=True) 
+                                yield content
                             if 'tool_calls' in msg_chunk:
                                 if not message_template:
                                     message_template = msg_chunk
                                 else:
-                                    # Handle tool call chunks if necessary
-                                    pass
+                                    if "tool_calls" not in message_template:
+                                        message_template["tool_calls"] = []
+                                    message_template["tool_calls"].extend(msg_chunk["tool_calls"])
                         if chunk.get('done'):
                             break
 
-                print() # New line after response
-                
                 # Add content to history if any
                 if full_content:
                     self.history.append({"role": "assistant", "content": full_content})
 
                 # Check for tool calls
                 if message_template and message_template.get("tool_calls"):
-                    # Only append the tool call message if it hasn't been added yet (it shouldn't be)
+                    # Record the assistant's intent to call tools
                     self.history.append(message_template)
                     
                     for tool_call in message_template["tool_calls"]:
@@ -222,11 +231,10 @@ class OllamaTBAgent:
                                 if callable(tool_entry):
                                     result = tool_entry(**func_args)
                                 else:
+                                    # This shouldn't happen with the current setup but for safety:
                                     mcp_result = self.mcp.call_tool(func_name, func_args)
-                                    try:
-                                        result = mcp_result["result"]["content"][0]["text"]
-                                    except (KeyError, IndexError):
-                                        result = str(mcp_result)
+                                    try: result = mcp_result["result"]["content"][0]["text"]
+                                    except: result = str(mcp_result)
                             except Exception as e:
                                 result = f"Error executing tool '{func_name}': {e}"
                         else:
@@ -234,7 +242,7 @@ class OllamaTBAgent:
                         
                         # Truncate results to keep context manageable (15k)
                         if isinstance(result, str) and len(result) > 15000:
-                            result = result[:15000] + "... [TRUNCATED - Too much data, please ask for specific parts if missing]"
+                            result = result[:15000] + "... [TRUNCATED]"
 
                         self.history.append({
                             "role": "tool",
@@ -243,13 +251,10 @@ class OllamaTBAgent:
                         })
                     continue # Call Ollama again with tool results
                 
-                if full_content:
-                    return full_content
+                return # Done
                 
-                return "Received empty response from Ollama."
-
             except Exception as e:
-                print(f"\n[Ollama Error] {e}")
-                return "Sorry, I encountered an error with Ollama."
+                yield f"\n[Ollama Error] {e}"
+                return
 
-        return "Exceeded maximum tool call iterations."
+        yield "\n[Error] Exceeded maximum tool call iterations."
