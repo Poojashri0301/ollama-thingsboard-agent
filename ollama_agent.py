@@ -108,6 +108,7 @@ class OllamaTBAgent:
                     "7. LISTING: To list items (devices, users), use 'getTenantDevices' or 'getUsers'. "
                     "8. USER STATUS: Check the 'enabled' field for disabled users. "
                     "9. KEYS: Common IP keys are 'ipAddress', 'public_ip', 'private_ip'. Common dimension keys are 'Length(feet)', 'Width(feet)'. "
+                    "10. TEMPERATURE: When asked for 'temperature', prioritize 'temperature celsius' or 'temperature_celsius' keys. If these exist, ONLY show their values. Keep the temperature response extremely concise, e.g., 'Temperature: 25°C (temperature_celsius)'. "
                     "You have 50+ local high-quality tools. Use them silently and proactively. If a question is plural, assume bulk."
                 )
             }

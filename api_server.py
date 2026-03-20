@@ -10,6 +10,15 @@ from ollama_agent import OllamaTBAgent
 from config import AGENT_TYPE
 
 app = FastAPI(title="ThingsBoard MCP Agent API")
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global agent instance or per-session? 
 # For now, let's stick to the ThingsBoard pattern where the agent is initialized once.
@@ -20,16 +29,24 @@ else:
     from gemini_agent import GeminiTBAgent
     agent = GeminiTBAgent()
 
-async def get_token(authorization: str = Header(None)):
-    if not authorization:
+async def get_token(authorization: str = Header(None), x_authorization: str = Header(None)):
+    auth_header = authorization or x_authorization
+    
+    if not auth_header:
+        print("[Auth Error] Authorization header missing")
         raise HTTPException(status_code=401, detail="Authorization header missing")
     
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(status_code=401, detail="Invalid authorization format. Use 'Bearer <token>'")
+    # print(f"[Auth] Received Authorization header: {auth_header[:30]}...")
     
-    token = parts[1]
+    parts = auth_header.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        token = parts[1]
+    else:
+        # Fallback for raw token if no Bearer prefix
+        token = auth_header
+    
     if not check_token_status(token):
+        # logging is already in check_token_status
         raise HTTPException(status_code=401, detail="Invalid ThingsBoard token")
     
     return token

@@ -30,12 +30,21 @@ graph TB
     subgraph "AI Agent Layer (Orchestration)"
         Agent["AI Orchestrator (Ollama / Gemini)"]
         History["Stateful History Manager"]
-        ToolRegistry["Tool Registry & Schema"]
+        ToolRegistry["Tool Registry (50+ Wrappers)"]
+    end
+
+    subgraph "Feature Modules (Modular TB Wrappers)"
+        direction LR
+        TM["Telemetry (tb_telemetry)"]
+        DV["Device (tb_device)"]
+        AT["Attributes (tb_attributes)"]
+        AS["Assets (tb_assets)"]
+        CU["Customer (tb_customer)"]
+        US["User (tb_user)"]
     end
 
     subgraph "Infrastructure Layer (MCP Abstraction)"
         MCP_Client["MCP Client (JSON-RPC/SSE)"]
-        TB_Modules["Modular TB Wrappers"]
     end
 
     subgraph "Data & IoT Layer"
@@ -50,40 +59,79 @@ graph TB
     SyncAPI <--> Agent
     Agent <--> ToolRegistry
     Agent <--> History
-    ToolRegistry <--> TB_Modules
-    TB_Modules <--> MCP_Client
+    
+    ToolRegistry --- TM
+    ToolRegistry --- DV
+    ToolRegistry --- AT
+    ToolRegistry --- AS
+    ToolRegistry --- CU
+    ToolRegistry --- US
+
+    TM & DV & AT & AS & CU & US <--> MCP_Client
     MCP_Client <--> MCP_Server
     MCP_Server <--> TB_Platform
 ```
 
-### 2. Sequence Flow: Streaming Chat Interaction
-This sequence diagram shows the end-to-end flow of a streaming request with ThingsBoard JWT authentication.
+### 2. Sequence Flow: Autonomous Tool Execution Loop
+TIA employs an autonomous loop where the agent iteratively calls tools until a comprehensive answer is reached.
 
 ```mermaid
 sequenceDiagram
     participant UI as UI Application
     participant API as API Server (TIA)
-    participant TB as ThingsBoard
     participant Agent as AI Agent (Ollama)
+    participant Tool as Modular Toolbox
     participant MCP as MCP Client
+    participant TB as ThingsBoard
     
     UI->>API: POST /api/chat (Bearer JWT)
     API->>TB: GET /api/pilti/checkTokenStatus
     TB-->>API: 200 OK (Token Valid)
     
     API->>Agent: ask_stream(question)
-    Agent-->>API: Yield Thinking...
-    API-->>UI: SSE Message (Thinking...)
     
-    rect rgb(240, 240, 240)
-        Note over Agent, MCP: Autonomous Tool Execution
-        Agent->>MCP: call_tool (getLatestTimeseries)
-        MCP->>Agent: Tool Result (JSON)
+    loop Autonomous Reasoning Phase
+        Agent->>Agent: Analyze Intent & Context
+        Agent->>Tool: Invoke Tool (e.g., getDeviceByName)
+        Tool->>MCP: call_tool(arguments)
+        MCP->>TB: REST/RPC Request
+        TB-->>MCP: JSON Response
+        MCP-->>Tool: Raw Data
+        Tool-->>Agent: Formatted Context
+        Agent-->>API: Yield Thinking...
+        API-->>UI: SSE (Thought Update)
     end
     
-    Agent-->>API: Yield Final Answer
-    API-->>UI: SSE Message (Answer)
+    Agent-->>API: Yield Final Synthesized Answer
+    API-->>UI: SSE Message (Final Answer)
     API-->>UI: SSE Event: Done
+```
+
+### 3. Data Flow: From IoT to Intelligence
+This diagram shows how telemetry data is transformed from raw platform metrics into natural language insights.
+
+```mermaid
+graph LR
+    subgraph "ThingsBoard Platform"
+        D["Device Telemetry"]
+        A["Attribute Metadata"]
+    end
+
+    subgraph "MCP Bridge"
+        S["MCP Server"]
+        C["MCP Client"]
+    end
+
+    subgraph "Intelligent Agent"
+        W["Modular Wrappers"]
+        LLM["LLM (Ollama/Gemini)"]
+    end
+
+    D & A --> S
+    S --> C
+    C --> W
+    W -- "Enriched Context" --> LLM
+    LLM -- "Natural Language" --> User((User))
 ```
 
 ---
@@ -112,6 +160,13 @@ Designed for integration with automated systems or simple REST consumers.
 - **Method**: `POST`
 - **Auth**: `Authorization: Bearer <JWT>`
 - **Response**: `{"content": "Full response text here..."}`
+116: 
+117: ### 3. Health Check
+118: Used to verify the service status and active AI agent type.
+119: - **URL**: `/api/health`
+120: - **Method**: `GET`
+121: - **Auth**: None
+122: - **Response**: `{"status": "ok", "agent": "ollama"}`
 
 ---
 

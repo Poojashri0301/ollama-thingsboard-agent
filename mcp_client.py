@@ -72,7 +72,7 @@ class MCPClient:
         print("[MCP] Handshake complete!")
 
     def _post(self, payload):
-        url = f"{MCP_SERVER_URL}/mcp/message?sessionId={self.session_id}"
+        url = f"{MCP_SERVER_URL}/mcp/message?sessionId={self.session_id}&session_id={self.session_id}"
         try:
             requests.post(
                 url,

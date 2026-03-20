@@ -157,14 +157,22 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
             if not available_keys:
                 continue
 
-            # Match key
-            if keys:
-                normalized = keys.lower().replace(" ", "").replace("_", "")
-                matched = [k for k in available_keys if normalized in k.lower().replace(" ", "").replace("_", "")
-                 or k.lower().replace(" ", "").replace("_", "") in normalized]
-                if not matched:
-                    continue
-                fetch_keys = ",".join(matched)
+                # Match key
+                if keys:
+                    normalized = keys.lower().replace(" ", "").replace("_", "")
+                    matched = [k for k in available_keys if normalized in k.lower().replace(" ", "").replace("_", "")
+                     or k.lower().replace(" ", "").replace("_", "") in normalized]
+                    
+                    # SPECIAL HANDLING: If 'temperature' was asked, and we have both 'temperature' and 'temperature_celsius',
+                    # prioritize the 'celsius' one as per user request.
+                    if normalized == "temperature":
+                        celsius_keys = [k for k in matched if "celsius" in k.lower()]
+                        if celsius_keys:
+                            matched = celsius_keys
+
+                    if not matched:
+                        continue
+                    fetch_keys = ",".join(matched)
             else:
                 fetch_keys = ",".join(available_keys)
 
@@ -366,6 +374,13 @@ def getLatestTimeseriesByName(entityType: str = "DEVICE", entityName: str = "", 
                     if normalized_user in normalized_k:
                         matched_keys.append(k)
                 
+                # SPECIAL HANDLING: If 'temperature' was asked, and we have both 'temperature' and 'temperature_celsius',
+                # prioritize the 'celsius' one as per user request.
+                if normalized_user == "temperature":
+                    celsius_keys = [k for k in matched_keys if "celsius" in k.lower()]
+                    if celsius_keys:
+                        matched_keys = celsius_keys
+
                 if not matched_keys:
                     continue
                 fetch_keys = ",".join(matched_keys)
