@@ -108,72 +108,82 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
                 continue
         return 0, False
 
-    # Resolve time range
-    if startTime:
-        start_ts, is_day = parse_time(startTime)
-        if endTime:
-            end_ts, _ = parse_time(endTime)
-        elif is_day:
-            # If only a date like '2026-03-08' is given, search the full 24h of that day
-            end_ts = start_ts + (24 * 3600 * 1000) - 1
-        else:
-            end_ts = now_ts
-        
-        # Ensure range is valid for TB
-        if start_ts == end_ts:
-            end_ts += 1000 # 1s window if exact timestamp
-        
-        # High limit for explicit dates to avoid missing data
-        fetch_limit = 10000
-    else:
-        start_ts = 0 if hours == 0 else now_ts - int(hours * 3600 * 1000)
-        end_ts = now_ts
-        fetch_limit = 5000 if calculate else limit
-
-    # Step 1: Get all devices
-    page, all_devices = 0, []
-    while True:
-        # print(f"[tb_telemetry] Fetching devices page {page} for historical search...")
-        data = json.loads(_extract(mcp.call_tool("getTenantDevices", {"pageSize": "50", "page": str(page)})))
-        all_devices.extend(data.get("data", []))
-        if not data.get("hasNext", False):
-            break
-        page += 1
-
-    if entityName:
-        all_devices = [d for d in all_devices if entityName.lower() in d.get("name", "").lower()]
-        if not all_devices:
-            return f"No device found with name: {entityName}"
-
-    results = {}
-    for device in all_devices:
-        entity_id = device["id"]["id"]
-        device_name = device.get("name")
-        try:
-            available_keys = json.loads(_extract(mcp.call_tool("getTimeseriesKeys", {
-                "entityType": "DEVICE", "entityIdStr": entity_id
-            })))
-            if not available_keys:
-                continue
-
-            # Match key
-            if keys:
-                normalized = keys.lower().replace(" ", "").replace("_", "")
-                matched = [k for k in available_keys if normalized in k.lower().replace(" ", "").replace("_", "")
-                    or k.lower().replace(" ", "").replace("_", "") in normalized]
+            # Resolve time range
+            if startTime:
+                start_ts, is_day = parse_time(startTime)
+                if endTime:
+                    end_ts, _ = parse_time(endTime)
+                elif is_day:
+                    # If only a date like '2026-03-08' is given, search the full 24h of that day
+                    end_ts = start_ts + (24 * 3600 * 1000) - 1
+                else:
+                    end_ts = now_ts
                 
-                # SPECIAL HANDLING: If 'temperature' was asked, and we have both 'temperature' and 'temperature_celsius',
-                # prioritize the 'celsius' one as per user request.
-                if normalized == "temperature":
-                    celsius_keys = [k for k in matched if "celsius" in k.lower()]
-                    if celsius_keys:
-                        matched = celsius_keys
-
-                if not matched:
-                    continue
-                fetch_keys = ",".join(matched)
+                # Ensure range is valid for TB
+                if start_ts == end_ts:
+                    end_ts += 1000 # 1s window if exact timestamp
+                
+                # High limit for explicit dates to avoid missing data
+                fetch_limit = 10000
             else:
-                fetch_keys = ",".join(available_keys)
+                start_ts = 0 if hours == 0 else now_ts - int(hours * 3600 * 1000)
+                end_ts = now_ts
+                fetch_limit = 5000 if calculate else limit
+
+            # Resolve if user asked for predicted data
+            is_predicted_query = "predicted" in keys.lower() or "forecast" in keys.lower()
+
+            # Step 1: Get all devices
+            page, all_devices = 0, []
+            while True:
+                # print(f"[tb_telemetry] Fetching devices page {page} for historical search...")
+                data = json.loads(_extract(mcp.call_tool("getTenantDevices", {"pageSize": "50", "page": str(page)})))
+                all_devices.extend(data.get("data", []))
+                if not data.get("hasNext", False):
+                    break
+                page += 1
+
+            if entityName:
+                all_devices = [d for d in all_devices if entityName.lower() in d.get("name", "").lower()]
+                if not all_devices:
+                    return f"No device found with name: {entityName}"
+
+            results = {}
+            for device in all_devices:
+                entity_id = device["id"]["id"]
+                device_name = device.get("name")
+                try:
+                    available_keys = json.loads(_extract(mcp.call_tool("getTimeseriesKeys", {
+                        "entityType": "DEVICE", "entityIdStr": entity_id
+                    })))
+                    if not available_keys:
+                        continue
+
+                    # Match key
+                    if keys:
+                        normalized = keys.lower().replace(" ", "").replace("_", "")
+                        matched = []
+                        for k in available_keys:
+                            normalized_k = k.lower().replace(" ", "").replace("_", "")
+                            if normalized in normalized_k or normalized_k in normalized:
+                                # Exclude predicted/forecast keys unless explicitly requested
+                                is_k_predicted = "predicted" in k.lower() or "forecast" in k.lower()
+                                if not is_predicted_query and is_k_predicted:
+                                    continue
+                                matched.append(k)
+                        
+                        # SPECIAL HANDLING: If 'temperature' was asked, and we have both 'temperature' and 'temperature_celsius',
+                        # prioritize the 'celsius' one as per user request.
+                        if normalized == "temperature":
+                            celsius_keys = [k for k in matched if "celsius" in k.lower()]
+                            if celsius_keys:
+                                matched = celsius_keys
+
+                        if not matched:
+                            continue
+                        fetch_keys = ",".join(matched)
+                    else:
+                        fetch_keys = ",".join(available_keys)
 
             # Fetch timeseries
             args = {
@@ -371,6 +381,10 @@ def getLatestTimeseriesByName(entityType: str = "DEVICE", entityName: str = "", 
                 for k in available_keys:
                     normalized_k = k.lower().replace(" ", "").replace("_", "").replace("%", "")
                     if normalized_user in normalized_k:
+                        # Exclude predicted/forecast keys unless explicitly requested
+                        is_k_predicted = "predicted" in k.lower() or "forecast" in k.lower()
+                        if not is_predicted and is_k_predicted:
+                            continue
                         matched_keys.append(k)
                 
                 # SPECIAL HANDLING: If 'temperature' was asked, and we have both 'temperature' and 'temperature_celsius',
