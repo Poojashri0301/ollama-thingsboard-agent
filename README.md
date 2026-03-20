@@ -160,13 +160,13 @@ Designed for integration with automated systems or simple REST consumers.
 - **Method**: `POST`
 - **Auth**: `Authorization: Bearer <JWT>`
 - **Response**: `{"content": "Full response text here..."}`
-116: 
-117: ### 3. Health Check
-118: Used to verify the service status and active AI agent type.
-119: - **URL**: `/api/health`
-120: - **Method**: `GET`
-121: - **Auth**: None
-122: - **Response**: `{"status": "ok", "agent": "ollama"}`
+
+### 3. Health Check
+Used to verify the service status and active AI agent type.
+- **URL**: `/api/health`
+- **Method**: `GET`
+- **Auth**: None
+- **Response**: `{"status": "ok", "agent": "ollama"}`
 
 ---
 
@@ -179,6 +179,31 @@ Designed for integration with automated systems or simple REST consumers.
 | **`tb_attributes`** | Entity Metadata | Shared vs Server attributes management. |
 | **`tb_assets`** | Hierarchy Management | Asset relation and grouping navigation. |
 | **`auth_service`** | Security Layer | ThingsBoard identity delegation. |
+
+---
+
+## 🔄 IoT Device Lifecycles (Enterprise Ecosystem)
+TIA provides specialized handling and LLM-ready context for a diverse range of IoT hardware. The following lifecycles are supported through modular feature wrappers.
+
+### 1. Vital Health Monitoring (ECG & Bio-Probes)
+- **ECG Monitor**: Real-time heartbeat amplitude streaming and historical waveform analysis.
+- **Heartbeat Probe**: Comprehensive vital tracking (BPM, BP, SpO2) with integrated predictive analytics for 24-72h trends.
+
+### 2. Industrial Environmental Probes
+- **Universal Probe**: High-precision tracking of Temperature, Humidity, AQI, and Air Quality (CO, NH3, NO2, O3, PM2.5).
+- **WL (Water Level)**: Real-time distance measurement with automated tank volume calculations (Liters/Gallons).
+- **Tag Probe**: Ultra-compact temperature sensing for mobile or space-constrained assets.
+
+### 3. Server Infrastructure Monitoring
+- **Pilti Server**: Performance tracking for backend nodes, covering CPU load, memory pressure, and Disk I/O.
+- **Advanced Inspection**: Integration with the Beszel/Grafana dashboards for system-level analytics.
+
+### 4. Security & Access Control
+- **RFID Scanner**: Perimeter security with remote RPC trigger support (`OpenLock`) and access audit logs.
+- **Access Cards**: Detailed credential management and historical audit trails for individual cardholders.
+
+### 5. Network & Offline Management
+- **Local Config**: Bootstrap provisioning via SoftAP and local HTTP handshake (Port 233) for secure SSID/MacID exchange.
 
 ---
 
