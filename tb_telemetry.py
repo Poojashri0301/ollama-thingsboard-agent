@@ -93,12 +93,39 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
     def parse_time(t_str: str) -> tuple[int, bool]:
         """Returns (timestamp_ms, is_date_only)"""
         if not t_str: return 0, False
-        t_str = t_str.strip()
+        t_str = t_str.strip().lower()
+        
+        # 1. Handle Digit-only (Unix timestamps)
         if t_str.isdigit():
             val = int(t_str)
             if len(t_str) == 10: return val * 1000, False
             return val, False
         
+        # 2. Handle "today", "yesterday", "this week"
+        now = datetime.now()
+        if t_str == "today":
+            dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            return int(dt.timestamp() * 1000), True
+        if t_str == "yesterday":
+            dt = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            return int(dt.timestamp() * 1000), True
+        if "this week" in t_str:
+            dt = now - timedelta(days=7)
+            return int(dt.timestamp() * 1000), False
+
+        # 3. Handle "X days/hours/minutes ago"
+        import re
+        match = re.search(r"(\d+)\s*(day|hour|minute)s?\s*ago", t_str)
+        if match:
+            num = int(match.group(1))
+            unit = match.group(2)
+            delta = timedelta(days=num) if unit == "day" else \
+                    timedelta(hours=num) if unit == "hour" else \
+                    timedelta(minutes=num)
+            dt = now - delta
+            return int(dt.timestamp() * 1000), False
+
+        # 4. Try standard date formats
         for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%B %d %Y", "%b %d %Y", "%m/%d/%Y"):
             try:
                 dt = datetime.strptime(t_str, fmt)
