@@ -217,10 +217,19 @@ Designed for responsive UIs where the AI's "thought process" and response are sh
 
 ### 2. Standard Synchronous Interaction
 Designed for integration with automated systems or simple REST consumers.
-- **URL**: `/api/chat/sync`
-- **Method**: `POST`
-- **Auth**: `Authorization: Bearer <JWT>`
+- **URL**: `/api/chat/sync` | **Method**: `POST` | **Auth**: `Bearer <JWT>`
+- **Request Body**: 
+  ```json
+  {
+    "question": "Get me the inventory of all sensors."
+  }
+  ```
 - **Response**: `application/json`
+  ```json
+  {
+    "content": "The inventory shows 15 active sensors across 3 zones."
+  }
+  ```
 
 ### 3. Health Check
 Used to verify the service status and active AI agent type.
