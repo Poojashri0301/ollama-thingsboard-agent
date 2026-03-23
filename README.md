@@ -108,13 +108,22 @@ sequenceDiagram
 ```
 
 ### 3. Data Flow: From IoT to Intelligence
-This diagram shows how telemetry data is transformed from raw platform metrics into natural language insights.
+This diagram shows how data from various entities is transformed from raw platform metrics into natural language insights.
 
 ```mermaid
 graph LR
     subgraph "ThingsBoard Platform"
-        D["Device Telemetry"]
-        A["Attribute Metadata"]
+        direction TB
+        subgraph "Entities"
+            D["Device"]
+            U["User"]
+            A["Asset"]
+        end
+        attr["Fetch Attributes"]
+        tele["Fetch Telemetry"]
+        
+        D & U & A --> attr
+        D & U & A --> tele
     end
 
     subgraph "MCP Bridge"
@@ -127,11 +136,11 @@ graph LR
         LLM["LLM (Ollama/Gemini)"]
     end
 
-    D & A --> S
+    attr & tele --> S
     S --> C
     C --> W
     W -- "Enriched Context" --> LLM
-    LLM -- "Natural Language" --> User((User))
+    LLM -- "Natural Language" --> UserNode((User))
 ```
 
 ---
@@ -152,21 +161,49 @@ Designed for responsive UIs where the AI's "thought process" and response are sh
 - **URL**: `/api/chat`
 - **Method**: `POST`
 - **Auth**: `Authorization: Bearer <JWT>`
-- **Body**: `{"question": "What is the average humidity today?"}`
+- **Request Body**: 
+  ```json
+  {
+    "question": "What is the frequency of Telemetry for device 'Main-Probe'?"
+  }
+  ```
+- **Response**: `text/event-stream` (SSE)
+  ```text
+  data: {"content": "Thinking..."}
+  data: {"content": "The device 'Main-Probe' sends telemetry every 60 seconds."}
+  data: [DONE]
+  ```
 
 ### 2. Standard Synchronous Interaction
 Designed for integration with automated systems or simple REST consumers.
 - **URL**: `/api/chat/sync`
 - **Method**: `POST`
 - **Auth**: `Authorization: Bearer <JWT>`
-- **Response**: `{"content": "Full response text here..."}`
+- **Request Body**: 
+  ```json
+  {
+    "question": "Get me the inventory of all sensors."
+  }
+  ```
+- **Response**: `application/json`
+  ```json
+  {
+    "content": "The inventory shows 15 active sensors across 3 zones."
+  }
+  ```
 
 ### 3. Health Check
 Used to verify the service status and active AI agent type.
 - **URL**: `/api/health`
 - **Method**: `GET`
 - **Auth**: None
-- **Response**: `{"status": "ok", "agent": "ollama"}`
+- **Response**: `application/json`
+  ```json
+  {
+    "status": "ok",
+    "agent": "ollama"
+  }
+  ```
 
 ---
 
@@ -178,6 +215,7 @@ Used to verify the service status and active AI agent type.
 | **`tb_device`** | Device Inventory | Bulk search, info retrieval, connection status. |
 | **`tb_attributes`** | Entity Metadata | Shared vs Server attributes management. |
 | **`tb_assets`** | Hierarchy Management | Asset relation and grouping navigation. |
+| **`tb_user`** | User Management | User profile, role verification, and details. |
 | **`auth_service`** | Security Layer | ThingsBoard identity delegation. |
 
 ---
@@ -212,13 +250,18 @@ System configuration is centralized in `config.py`.
 
 ```python
 # Deployment targets
-THINGSBOARD_URL = "http://tb.example.com"
+THINGSBOARD_URL = "https://tb-test.example.com"
 MCP_SERVER_URL  = "http://192.168.1.165:8090"
 
 # AI Inference Engine
-AGENT_TYPE = "ollama"  # Production: 'ollama' for local privacy, 'gemini' for scale
+AGENT_TYPE = "ollama"  # 'ollama' or 'gemini'
+
+# Ollama Config
 OLLAMA_BASE_URL = "http://192.168.1.40:11434"
 OLLAMA_MODEL = "qwen2.5:7b"
+
+# Gemini Config
+GEMINI_API_KEY = "AIzaSy..."
 ```
 
 ---
