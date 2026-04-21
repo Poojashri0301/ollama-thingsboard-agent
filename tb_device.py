@@ -54,7 +54,7 @@ def getTenantDevices(pageSize: int = 100, type: str = "", textSearch: str = "", 
             break
         page += 1
     
-    return json.dumps({"devices": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2)
+    return json.dumps({"devices": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2, ensure_ascii=False)
 
 # ── Get device by ID ─────────────────────────────────────
 
@@ -115,7 +115,7 @@ def getTenantDeviceInfos(pageSize: int = 100, type: str = "", deviceProfileId: s
             break
         page += 1
     
-    return json.dumps({"device_infos": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2)
+    return json.dumps({"device_infos": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2, ensure_ascii=False)
 
 # ── Get multiple devices by IDs ──────────────────────────
 
@@ -151,7 +151,7 @@ def getCustomerDevices(customerId: str, pageSize: int = 100, type: str = "", tex
             break
         page += 1
         
-    return json.dumps({"devices": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2)
+    return json.dumps({"devices": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2, ensure_ascii=False)
 
 # ── Get detailed device info by customer ─────────────────
 
@@ -174,7 +174,7 @@ def getCustomerDeviceInfos(customerId: str, pageSize: str = "100", type: str = "
             break
         page += 1
         
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)
 
 # ── Get devices by entity group ──────────────────────────
 
@@ -194,7 +194,7 @@ def getDevicesByEntityGroupId(entityGroupId: str, pageSize: str = "100", sortPro
             break
         page += 1
         
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)
 
 def getDeviceByName(deviceName: str) -> str:
     """Get a device by its exact name. Use when user provides exact device name."""
@@ -206,7 +206,7 @@ def getDeviceByName(deviceName: str) -> str:
         match = next((d for d in data.get("data", [])
                      if deviceName.lower() in d.get("name", "").lower()), None)
         if match:
-            return json.dumps(match, indent=2)
+            return json.dumps(match, indent=2, ensure_ascii=False)
         if not data.get("hasNext", False):
             return f"No device found with name: {deviceName}"
         page += 1
@@ -262,7 +262,7 @@ def getDeviceFullDetails(deviceName: str) -> str:
         "raw_profile": device_base
     }
 
-    return json.dumps(full_details, indent=2)
+    return json.dumps(full_details, indent=2, ensure_ascii=False)
 
 
 def getDevicesByUserName(userName: str) -> str:
@@ -322,4 +322,4 @@ def getDevicesByUserName(userName: str) -> str:
         "label": d.get("label")
     } for d in all_devices]
 
-    return json.dumps(result, indent=2)
+    return json.dumps(result, indent=2, ensure_ascii=False)

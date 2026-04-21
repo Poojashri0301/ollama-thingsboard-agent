@@ -2,7 +2,7 @@
 from mcp_client import MCPClient
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 mcp = None
 
@@ -109,17 +109,28 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
         if t_str == "yesterday":
             dt = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
             return int(dt.timestamp() * 1000), True
-        if "this week" in t_str:
+        if t_str == "this week":
             dt = now - timedelta(days=7)
             return int(dt.timestamp() * 1000), False
+        if t_str == "last week":
+            dt = now - timedelta(days=14)
+            return int(dt.timestamp() * 1000), False
+        if t_str == "this month":
+            dt = now - timedelta(days=30)
+            return int(dt.timestamp() * 1000), False
+        if t_str == "last month":
+            dt = now - timedelta(days=60)
+            return int(dt.timestamp() * 1000), False
 
-        # 3. Handle "X days/hours/minutes ago"
+        # 3. Handle "X [unit]s ago"
         import re
-        match = re.search(r"(\d+)\s*(day|hour|minute)s?\s*ago", t_str)
+        match = re.search(r"(\d+)\s*(day|week|month|hour|minute)s?\s*ago", t_str)
         if match:
             num = int(match.group(1))
             unit = match.group(2)
             delta = timedelta(days=num) if unit == "day" else \
+                    timedelta(days=num*7) if unit == "week" else \
+                    timedelta(days=num*30) if unit == "month" else \
                     timedelta(hours=num) if unit == "hour" else \
                     timedelta(minutes=num)
             dt = now - delta
@@ -199,10 +210,10 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
                             continue
                         matched.append(k)
                 
-                # SPECIAL HANDLING: If 'temperature' was asked, and we have both 'temperature' and 'temperature_celsius',
-                # prioritize the 'celsius' one as per user request.
-                if normalized == "temperature":
-                    celsius_keys = [k for k in matched if "celsius" in k.lower()]
+                # SPECIAL HANDLING: If 'temperature' or 'temp' was asked, and we have both keys,
+                # prioritize the 'celsius' one (e.g. 'ambient_temp' vs 'ambient_temp_celsius').
+                if "temp" in normalized:
+                    celsius_keys = [k for k in matched if "cels" in k.lower()]
                     if celsius_keys:
                         matched = celsius_keys
 
@@ -272,7 +283,10 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
                 for key, key_list in parsed.items():
                     values = []
                     for item in key_list:
-                        try: values.append(float(item.split(" @ ")[0]))
+                        try:
+                            # If it's already aggregated server-side, it might just be the value
+                            val_part = item.split(" @ ")[0]
+                            values.append(float(val_part))
                         except: continue
                     
                     if values:
@@ -284,19 +298,21 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
                             len(values) if calc in ("count", "number of") else
                             sum(values) / len(values)
                         )
-                        agg_results[key] = {
-                            "result": round(res, 4),
-                            "count": len(values),
-                            "avg": round(sum(values)/len(values), 2) if values else 0
-                        }
+                        
+                        # Add units for common keys
+                        unit = ""
+                        if "cels" in key.lower() or "temp" in key.lower(): unit = "°C"
+                        elif "humid" in key.lower(): unit = "%"
+                        
+                        agg_results[key] = f"{round(res, 2)}{unit}"
 
                 if agg_results:
-                    results[device_name] = {
-                        "calculate": calculate,
-                        "results_per_key": agg_results,
-                        "note": "Calculated in Python from raw points" if not use_server_agg else "Calculated server-side"
-                    }
+                    results[device_name] = agg_results
             else:
+                # Normal historical view: remove timestamps if user just wants "ans alone"
+                # but keep them if they are historical. 
+                # Actually, the prompt will now control the agent's output.
+                # To be safe, if there's only one point, we can simplify.
                 results[device_name] = {k: v[:fetch_limit] for k, v in parsed.items()}
 
             continue
@@ -326,7 +342,7 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
                         except:
                             pass
         
-        final_str = json.dumps(results, indent=2)
+        final_str = json.dumps(results, indent=2, ensure_ascii=False)
         if is_old_data:
             final_str += "\n\nNote: The latest available data for these keys is older than 24 hours (e.g. from a previous year). These are the absolute most recent values stored in the database."
         return final_str
@@ -341,6 +357,17 @@ def getTimeseriesByName(entityName: str = "", keys: str = "", hours: float = 0, 
             time_range_desc = "for the requested period"
             
         msg = f"No telemetry data found for key: '{keys}' {time_range_desc}. The data is either older or non-existent in this window.\n\n"
+        
+        # Diagnostic: show available keys for the first device found
+        if all_devices:
+            try:
+                available_keys = json.loads(_extract(mcp.call_tool("getTimeseriesKeys", {
+                    "entityType": "DEVICE", "entityIdStr": all_devices[0]["id"]["id"]
+                })))
+                if available_keys:
+                    msg += f"Note: Available keys for '{all_devices[0].get('name')}' are: {', '.join(available_keys)}\n\n"
+            except: pass
+
         msg += f"Here is the '{calc_word}' of the absolute most recent values stored in the database instead:\n"
         
         # Recursive call with hours=0 and no startTime to fetch the absolute latest points
@@ -414,10 +441,10 @@ def getLatestTimeseriesByName(entityType: str = "DEVICE", entityName: str = "", 
                             continue
                         matched_keys.append(k)
                 
-                # SPECIAL HANDLING: If 'temperature' was asked, and we have both 'temperature' and 'temperature_celsius',
+                # SPECIAL HANDLING: If 'temperature' or 'temp' was asked, and we have both keys,
                 # prioritize the 'celsius' one as per user request.
-                if normalized_user == "temperature":
-                    celsius_keys = [k for k in matched_keys if "celsius" in k.lower()]
+                if "temp" in normalized_user:
+                    celsius_keys = [k for k in matched_keys if "cels" in k.lower()]
                     if celsius_keys:
                         matched_keys = celsius_keys
 
@@ -442,4 +469,4 @@ def getLatestTimeseriesByName(entityType: str = "DEVICE", entityName: str = "", 
     if not results:
         return f"No telemetry found for key: '{keys}' across all devices."
 
-    return json.dumps(results, indent=2)
+    return json.dumps(results, indent=2, ensure_ascii=False)

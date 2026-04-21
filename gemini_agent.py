@@ -101,9 +101,14 @@ class GeminiTBAgent:
         ]
 
         self.history = []
+        self.system_prompt = (
+            "You are a ThingsBoard Assistant. You MUST use tools for all operations. "
+            "1. BE DIRECT: Execute tools immediately. "
+            "2. CELSIUS ONLY: When asked for 'temperature', ALWAYS prioritize keys containing 'celsius'. Report values exactly as provided by ThingsBoard in Celsius. NEVER convert to Fahrenheit. "
+            "3. HISTORICAL & AGGREGATE: For 'min, max, avg, sum', or questions with timeframes, ALWAYS use 'getTimeseriesByName'. It handles relative time like 'this week' automatically. "
+            "4. NO fillers: Be extremely concise. "
+        )
         print("[Gemini] Agent ready!")
-
-
 
     def ask(self, question: str):
         print(f"\n[You] {question}")
@@ -112,13 +117,13 @@ class GeminiTBAgent:
             types.Content(role="user", parts=[types.Part(text=question)])
         )
 
-        # Retry up to 3 times on quota error
         for attempt in range(3):
             try:
                 response = gemini_client.models.generate_content(
                     model="models/gemini-2.5-flash",
                     contents=self.history,
                     config=types.GenerateContentConfig(
+                        system_instruction=self.system_prompt,
                         tools=self.tools,
                         automatic_function_calling=types.AutomaticFunctionCallingConfig(
                             disable=False

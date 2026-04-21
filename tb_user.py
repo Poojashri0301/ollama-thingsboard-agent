@@ -44,7 +44,7 @@ def getUsers(pageSize: int = 100, max_pages: int = 10) -> str:
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"users": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2)
+    return json.dumps({"users": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2, ensure_ascii=False)
 
 # Get a specific user by their ID.
 def getUserById(userId: str) -> str:
@@ -84,8 +84,8 @@ def findUserByName(userName: str) -> str:
     if not all_users:
         return f"No user found matching: {userName}"
     if len(all_users) == 1:
-        return json.dumps(all_users[0], indent=2)
-    return json.dumps(all_users, indent=2)
+        return json.dumps(all_users[0], indent=2, ensure_ascii=False)
+    return json.dumps(all_users, indent=2, ensure_ascii=False)
 
 def getUserFullDetails(userName: str) -> str:
     """
@@ -102,7 +102,7 @@ def getUserFullDetails(userName: str) -> str:
     try:
         user_base = json.loads(user_raw)
         if isinstance(user_base, list):
-            return f"Multiple users found for '{userName}':\n" + json.dumps(user_base, indent=2)
+            return f"Multiple users found for '{userName}':\n" + json.dumps(user_base, indent=2, ensure_ascii=False)
     except:
         return f"Error parsing user info: {user_raw}"
 
@@ -125,7 +125,7 @@ def getUserFullDetails(userName: str) -> str:
         "raw_profile": user_base
     }
 
-    return json.dumps(full_details, indent=2)
+    return json.dumps(full_details, indent=2, ensure_ascii=False)
 
 
 # Get all tenant administrator users assigned to a specific tenant. 
@@ -157,7 +157,7 @@ def getTenantAdmins() -> str:
         "email": u.get("email", "")
     } for u in all_users]
 
-    return json.dumps(result, indent=2)
+    return json.dumps(result, indent=2, ensure_ascii=False)
 
 # Get all users assigned to a specific customer.
 def getCustomerUsers(customerId: str, pageSize: str = "100", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
@@ -176,7 +176,7 @@ def getCustomerUsers(customerId: str, pageSize: str = "100", textSearch: str = "
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)
 
 def getAllCustomerUsers(max_customers: int = 5, max_users_per_customer: int = 2) -> str:
     """
@@ -218,7 +218,7 @@ def getAllCustomerUsers(max_customers: int = 5, max_users_per_customer: int = 2)
         "enabled": u.get("additionalInfo", {}).get("userStatus", "") != "DISABLED"
     } for u in all_users]
 
-    return json.dumps({"data": result, "truncated": page == max_customers}, indent=2)
+    return json.dumps({"data": result, "truncated": page == max_customers}, indent=2, ensure_ascii=False)
 
 # Get list of users that can be assigned to a specific alarm.
 def getUsersForAssign(alarmId: str, pageSize: str = "100", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
@@ -236,7 +236,7 @@ def getUsersForAssign(alarmId: str, pageSize: str = "100", textSearch: str = "",
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)
 
 # Get all users that belong to a specific entity group.
 def getUsersByEntityGroupId(entityGroupId: str, pageSize: str = "100", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
@@ -254,4 +254,4 @@ def getUsersByEntityGroupId(entityGroupId: str, pageSize: str = "100", textSearc
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)

@@ -129,7 +129,7 @@ def getUserAttributesByName(entityName: str) -> str:
         
         # Flatten to simpler {key: value} format
         flattened = {item.get("key"): item.get("value") for item in parsed_list}
-        return json.dumps(flattened, indent=2)
+        return json.dumps(flattened, indent=2, ensure_ascii=False)
     except Exception as e:
         return f"Error fetching attributes for {entityName}: {e}"
 
@@ -231,7 +231,7 @@ def getDeviceAttributesByName(entityName: str, scope: str = "") -> str:
         except Exception as e:
             results[s] = {"error": str(e)}
 
-    return json.dumps(results, indent=2)
+    return json.dumps(results, indent=2, ensure_ascii=False)
 
 # Fetches all currently active devices.
 def getActiveDevices() -> str:
@@ -310,7 +310,7 @@ def getActiveDevices() -> str:
                     "status": "Active"
                 })
             
-        return json.dumps({"active_devices": active_list, "count": len(active_list)}, indent=2)
+        return json.dumps({"active_devices": active_list, "count": len(active_list)}, indent=2, ensure_ascii=False)
     except Exception as e:
         print(f"[tb_attributes] Batch fetch failed: {e}. Falling back to list-and-check...")
         return "Failed to fetch active status for all devices. Please specify a device name to check specifically."
@@ -402,7 +402,7 @@ def getDevicesConnectionStatus() -> str:
             
             results.append(status)
             
-        return json.dumps({"devices": results, "count": len(results)}, indent=2)
+        return json.dumps({"devices": results, "count": len(results)}, indent=2, ensure_ascii=False)
     except Exception as e:
         return f"Error fetching connection status: {e}"
 
@@ -445,7 +445,7 @@ def getDevicesAttributes(keys: str) -> str:
                     results.append({"name": d["name"], "custom_attributes": custom_attrs})
             except:
                 pass
-        return json.dumps({"devices": results, "note": "Showing all custom attributes for up to 20 devices."}, indent=2)
+        return json.dumps({"devices": results, "note": "Showing all custom attributes for up to 20 devices."}, indent=2, ensure_ascii=False)
 
     entity_ids = [d["id"] for d in devices]
     
@@ -488,6 +488,6 @@ def getDevicesAttributes(keys: str) -> str:
             
             results.append(status)
             
-        return json.dumps({"devices": results, "count": len(results)}, indent=2)
+        return json.dumps({"devices": results, "count": len(results)}, indent=2, ensure_ascii=False)
     except Exception as e:
         return f"Error fetching bulk attributes: {e}"

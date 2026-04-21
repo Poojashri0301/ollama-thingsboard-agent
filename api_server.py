@@ -57,13 +57,13 @@ async def chat_stream(
     token: str = Depends(get_token)
 ):
     """
-    Streaming chat endpoint. 
-    Accepts a question and streams back the assistant's response via SSE.
+    Standard streaming chat endpoint.
+    Returns a Server-Sent Events (SSE) stream for the UI.
     """
     async def event_generator():
-        # Running the synchronous generator in a thread to not block the event loop
         loop = asyncio.get_event_loop()
         gen = agent.ask_stream(question)
+        full_content = ""
         
         def safe_next(g):
             try:
@@ -72,29 +72,16 @@ async def chat_stream(
                 return None
 
         while True:
-            try:
-                # Run the safe helper in a separate thread
-                chunk = await loop.run_in_executor(None, safe_next, gen)
-                if chunk is not None:
-                    yield {
-                        "event": "message",
-                        "data": json.dumps({"content": chunk})
-                    }
-                else:
-                    # End of stream
-                    yield {
-                        "event": "done",
-                        "data": "[DONE]"
-                    }
-                    break
-            except Exception as e:
-                yield {
-                    "event": "error",
-                    "data": json.dumps({"detail": str(e)})
-                }
+            chunk = await loop.run_in_executor(None, safe_next, gen)
+            if chunk is not None:
+                full_content += chunk
+                # Yield a progressive full-text chunk
+                yield {"data": json.dumps({"content": full_content})}
+            else:
+                yield {"data": "[DONE]"}
                 break
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(event_generator(), ping=15)
 
 @app.post("/api/chat/sync")
 async def chat_sync(
@@ -109,7 +96,11 @@ async def chat_sync(
     try:
         # Run the synchronous ask call in a separate thread
         response_text = await loop.run_in_executor(None, agent.ask, question)
-        return {"content": response_text}
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            content={"content": response_text},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -117,5 +108,28 @@ async def chat_sync(
 async def health():
     return {"status": "ok", "agent": AGENT_TYPE}
 
+def get_local_ip():
+    """Finds the primary local network IP address."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    local_ip = get_local_ip()
+    print("\n" + "="*50)
+    print("🚀 Pilti AI Agent - Enterprise API Server")
+    print("="*50)
+    print(f"📡 API URL:      http://{local_ip}:8000")
+    print(f"🏥 Health Check: http://{local_ip}:8000/api/health")
+    print(f"🤖 Agent Type:   {AGENT_TYPE.upper()}")
+    print("="*50 + "\n")
+    
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

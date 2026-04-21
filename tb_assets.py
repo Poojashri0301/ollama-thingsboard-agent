@@ -43,7 +43,7 @@ def getTenantAssets(pageSize: int = 100, max_pages: int = 10) -> str:
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"assets": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2)
+    return json.dumps({"assets": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2, ensure_ascii=False)
 
 # Get a specific asset by its ID.
 def getAssetById(assetId: str) -> str:
@@ -75,7 +75,7 @@ def getCustomerAssets(customerId: str, pageSize: str = "100", type: str = "", te
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data, "truncated": page == max_pages}, indent=2)
+    return json.dumps({"data": all_data, "truncated": page == max_pages}, indent=2, ensure_ascii=False)
 
 # Get all assets assigned to a specific user.
 def getUserAssets(userId: str, pageSize: str = "100", type: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
@@ -94,7 +94,7 @@ def getUserAssets(userId: str, pageSize: str = "100", type: str = "", textSearch
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)
 
 
 # Get detailed info of all assets assigned to a specific customer.
@@ -114,7 +114,7 @@ def getCustomerAssetInfos(customerId: str, pageSize: str = "100", type: str = ""
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)
 
 #  Get all assets with extra details like customer name and asset profile.
 def getTenantAssetInfos(pageSize: str = "100", type: str = "", assetProfileId: str = "", textSearch: str = "", sortProperty: str = "", sortOrder: str = "") -> str:
@@ -133,7 +133,7 @@ def getTenantAssetInfos(pageSize: str = "100", type: str = "", assetProfileId: s
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)
 
 # Get multiple assets at once using comma separated IDs.
 def getAssetsByIds(assetIds: str) -> str:
@@ -155,4 +155,4 @@ def getAssetsByEntityGroupId(entityGroupId: str, pageSize: str = "100", sortProp
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)

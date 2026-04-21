@@ -40,7 +40,7 @@ def getCustomers(pageSize: int = 100, max_pages: int = 10) -> str:
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"customers": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2)
+    return json.dumps({"customers": all_data, "count": len(all_data), "truncated": page == max_pages}, indent=2, ensure_ascii=False)
 
 #  Get a specific customer by their UUID.
 def getCustomerById(customerId: str) -> str:
@@ -76,4 +76,4 @@ def getCustomersByEntityGroupId(entityGroupId: str, pageSize: str = "100", textS
         if not data.get("hasNext", False):
             break
         page += 1
-    return json.dumps({"data": all_data}, indent=2)
+    return json.dumps({"data": all_data}, indent=2, ensure_ascii=False)

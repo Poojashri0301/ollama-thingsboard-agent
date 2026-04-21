@@ -15,7 +15,8 @@ import tb_customer
 import tb_user
 
 class OllamaTBAgent:
-    def __init__(self):
+    def __init__(self, model_name: str = None):
+        self.model_name = model_name or OLLAMA_MODEL
         # Start MCP client
         self.mcp = MCPClient()
         time.sleep(2)
@@ -100,7 +101,7 @@ class OllamaTBAgent:
                     "1. BE DIRECT: Execute tools immediately. NEVER say 'I will use tool X' or 'Let's try Y'. Just call the tool and show the result. "
                     "2. BULK PROACTIVITY: If asked general questions like 'what are the public IPs', 'what is the software version', or 'what are the custom attributes', NEVER ask 'which device?'. Instead, use 'getDevicesAttributes' with the likely keys (e.g., 'ipAddress, public_ip', or just 'custom' if asking for all custom attributes). "
                     "3. BULK STATUS: For status, connection times, or forecast times for MULTIPLE or 'VARIOUS' devices, ALWAYS use 'getDevicesConnectionStatus'. "
-                    "4. HISTORICAL & AGGREGATE: For 'min, max, avg, sum, count', 'historical', 'last 10 values', or questions with timeframes ('last 24 hours', 'last month'), ALWAYS use 'getTimeseriesByName'. It calculates aggregates across devices for the time range automatically, or simply fetches the last N values if no calculation is specified. "
+                    "4. HISTORICAL & AGGREGATE: For 'min, max, avg, sum, count', 'historical', 'last 10 values', or questions with timeframes ('last 24 hours', 'last month'), ALWAYS use 'getTimeseriesByName'. You MUST pass the stat type (avg, min, max, sum) to the 'calculate' parameter for all statistics. "
                     "5. OLD DATA: If the tool returns dates from a previous year (like 2025), explicitly tell the user 'These are the most recent values available in the database, but they are from [Year].' Do not pretend they are recent."
                     "6. THERMOSTAT/TANKS: Technical data like forecast or dimensions are in 'SHARED_SCOPE'. "
                     "6. CHILDREN & RELATIONS: If asked for 'children' for a SPECIFIC entity, use 'getEntityChildren'. If asked for 'assets and their children' (BULK), ALWAYS use 'getAssetsWithChildren'. "
@@ -108,13 +109,13 @@ class OllamaTBAgent:
                     "7. LISTING: To list items (devices, users), use 'getTenantDevices' or 'getUsers'. "
                     "8. USER STATUS: Check the 'enabled' field for disabled users. "
                     "9. KEYS: Common IP keys are 'ipAddress', 'public_ip', 'private_ip'. Common dimension keys are 'Length(feet)', 'Width(feet)'. "
-                    "10. TEMPERATURE/WATER: When asked for 'temperature' or 'water level', prioritize 'temperature celsius' or 'water level' keys respectively. ONLY show requested values. NEVER include 'predicted' or 'forecast' data unless explicitly asked. "
-                    "11. CONCISENESS: Your responses MUST be extremely concise. Do not add conversational filler. Just provide the answer based on the tool results. "
+                    "10. TEMPERATURE/CELSIUS: When asked for 'temperature', ALWAYS prioritize keys containing 'celsius' (like 'temperature_celsius'). Show values ONLY in Celsius as they appear in ThingsBoard. NEVER convert to Fahrenheit. NEVER include 'predicted' or 'forecast' data unless explicitly asked. "
+                    "11. CONCISENESS & ANS ALONE: Your responses MUST be extremely concise. For 'average temperature' or any numeric statistic, respond ONLY with the answer in a natural sentence, e.g., 'The average temperature is 25.5°C'. DO NOT include timestamps, device IDs, or technical metadata unless specifically asked for 'details' or 'history'. "
                     "You have 50+ local high-quality tools. Use them silently and proactively. If a question is plural, assume bulk."
                 )
             }
         ]
-        print(f"[Ollama] Agent ready with model: {OLLAMA_MODEL}")
+        print(f"[Ollama] Agent ready with model: {self.model_name}")
 
     def _generate_tool_schema(self, func):
         """Generates robust Ollama-compatible JSON schema with full docstrings."""
@@ -159,29 +160,59 @@ class OllamaTBAgent:
         }
 
     def ask(self, question: str):
-        """Sync wrapper for legacy/CLI usage."""
+        """Sync wrapper for legacy/CLI usage. Prints to stdout."""
         full_content = ""
         for chunk in self.ask_stream(question):
+            print(chunk, end="", flush=True)
             full_content += chunk
-        print() # New line after response
+        print() 
         return full_content
+
+    def _manage_history(self, max_turns: int = 10):
+        """
+        Ensures the history doesn't exceed context limits.
+        - Preserves the system prompt.
+        - Keeps the last N turns (user + assistant/tool blocks).
+        """
+        if len(self.history) <= max_turns + 1:
+            return
+        
+        system_prompt = self.history[0]
+        recent_history = self.history[-(max_turns):]
+        
+        # Ensure we don't start with a 'tool' role without a previous assistant call
+        # (Ollama/LLMs can be picky about the sequence)
+        while recent_history and recent_history[0]["role"] == "tool":
+            recent_history.pop(0)
+            
+        self.history = [system_prompt] + recent_history
+        print(f"[Ollama] Managed history: {len(self.history)} messages retained.")
 
     def ask_stream(self, question: str):
         """Streaming version of ask. Yields chunks of text for API/UI usage."""
-        # Note: We don't print here to avoid cluttering API usage,
-        # but let the caller handle printing if needed.
+        # 1. Manage history before adding a new question
+        self._manage_history()
+        
         self.history.append({"role": "user", "content": question})
 
         max_iterations = 5
         for _ in range(max_iterations):
             payload = {
-                "model": OLLAMA_MODEL,
+                "model": self.model_name,
                 "messages": self.history,
                 "tools": self.tools_schema,
-                "stream": True
+                "stream": True,
+                "options": {
+                    "num_ctx": 8192,  # Substantially larger context window
+                    "temperature": 0  # More stable for tool usage
+                }
             }
 
             try:
+                if not OLLAMA_BASE_URL:
+                    yield "\n[Ollama Error] OLLAMA_BASE_URL is not configured. Please check your dynamic configuration endpoint."
+                    return
+
                 response = requests.post(
                     f"{OLLAMA_BASE_URL}/api/chat", 
                     json=payload, 
@@ -198,12 +229,11 @@ class OllamaTBAgent:
                         chunk = json.loads(line.decode('utf-8'))
                         if 'message' in chunk:
                             msg_chunk = chunk['message']
-                            if 'content' in msg_chunk:
-                                content = msg_chunk['content']
+                            content = msg_chunk.get('content')
+                            if content:
                                 full_content += content
-                                # Also support CLI printing for now if desired, but yielding is key
-                                # print(content, end="", flush=True) 
                                 yield content
+                            
                             if 'tool_calls' in msg_chunk:
                                 if not message_template:
                                     message_template = msg_chunk
@@ -242,9 +272,10 @@ class OllamaTBAgent:
                         else:
                             result = f"Tool {func_name} not found."
                         
-                        # Truncate results to keep context manageable (15k)
-                        if isinstance(result, str) and len(result) > 15000:
-                            result = result[:15000] + "... [TRUNCATED]"
+                        # Truncate results to keep context manageable (8k)
+                        # We use 8k here to leave room for the prompt and other turn data
+                        if isinstance(result, str) and len(result) > 8000:
+                            result = result[:8000] + "... [TRUNCATED]"
 
                         self.history.append({
                             "role": "tool",

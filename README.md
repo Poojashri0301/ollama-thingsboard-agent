@@ -351,10 +351,50 @@ python api_server.py
 ```
 
 Example queries:
-- "List all devices in my tenant."
-- "What is the latest temperature for Device A?"
-- "Get details for the asset 'Warehouse 1'."
 - "List all users assigned to Customer X."
+- "Get details for the user 'john@example.com'."
+
+---
+
+## 🏃 Manual Execution Guide
+
+Follow these steps to run the project in your local environment.
+
+### 1. Model Preparation (Ollama)
+Ensure Ollama is running and you have the required model downloaded:
+```bash
+ollama pull qwen3:8b
+```
+
+### 2. Dependency Installation
+Create a virtual environment (optional but recommended) and install the backend requirements:
+```bash
+# Windows
+python -m venv venv
+.\venv\Scripts\activate
+
+# Install
+pip install -r requirements.txt
+```
+
+### 3. Server Startup
+You can run the agent in two modes:
+
+#### Option A: Interactive CLI (Fast Testing)
+```bash
+python main.py
+```
+*Choose '2' for Ollama and start chatting.*
+
+#### Option B: Enterprise API Server (Production/Mobile App)
+```bash
+python api_server.py
+```
+*The server will start on `http://0.0.0.0:8000`. Watch the console for your **Local IP Address**.*
+
+### 4. Connection Tips
+- **Port**: Ensure port `8000` is open on your machine.
+- **Discovery**: If you are using the mobile app, enter the local IP address of your computer into your app's configuration.
 
 ---
 
